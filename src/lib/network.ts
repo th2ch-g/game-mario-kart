@@ -41,7 +41,7 @@ interface RoomCallbacks {
   start: (config: RaceConfig, specs: RacerSpec[]) => void;
   lobby: () => void;
 }
-const VERSION = 1,
+const VERSION = 2,
   PREFIX = 'kartline-v1-',
   SESSION = 'kartline.room.v1';
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -99,7 +99,9 @@ function isSnapshot(value: unknown): value is RaceState {
         h &&
         Number.isFinite(h.s) &&
         Number.isFinite(h.offset) &&
-        ['rocket', 'mine'].includes(h.kind),
+        ['rocket', 'green', 'mine', 'blue'].includes(h.kind) &&
+        Number.isFinite(h.yaw) &&
+        Number.isFinite(h.direction),
     ) &&
     Array.isArray(v.events) &&
     v.events.length <= 16 &&
@@ -119,6 +121,15 @@ function isSnapshot(value: unknown): value is RaceState {
           'offset',
           'yaw',
           'speed',
+          'steer',
+          'lift',
+          'verticalSpeed',
+          'star',
+          'shrink',
+          'bullet',
+          'hop',
+          'trickProgress',
+          'roulette',
           'rank',
           'lap',
           'boost',

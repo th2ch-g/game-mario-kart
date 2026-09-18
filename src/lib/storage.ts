@@ -1,6 +1,6 @@
 import type { RecordEntry, Settings } from '../game/types';
 const SETTINGS_KEY = 'kartline.settings.v1',
-  RECORDS_KEY = 'kartline.records.v1';
+  RECORDS_KEY = 'kartline.records.v2';
 export const DEFAULT_SETTINGS: Settings = {
   name: 'Player',
   kart: 0,
@@ -63,7 +63,11 @@ export function readRecords(): RecordEntry[] {
               p &&
               ['t', 's', 'offset', 'yaw'].every(
                 (k) => typeof p[k] === 'number' && Number.isFinite(p[k]),
-              ),
+              ) &&
+              (p.lift === undefined ||
+                (typeof p.lift === 'number' &&
+                  Number.isFinite(p.lift) &&
+                  p.lift >= 0)),
           ),
       )
       .slice(0, 3);

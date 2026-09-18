@@ -26,6 +26,12 @@ it('buffers an item press released between simulation frames', () => {
   expect(input.read().item).toBe(true);
   expect(input.read().item).toBe(false);
 });
+it('buffers a short jump-action tap between simulation frames', () => {
+  key('keydown', 'ShiftLeft');
+  key('keyup', 'ShiftLeft');
+  expect(input.read().drift).toBe(true);
+  expect(input.read().drift).toBe(false);
+});
 it('keeps both players item taps separate', () => {
   input.local = true;
   key('keydown', 'Enter');

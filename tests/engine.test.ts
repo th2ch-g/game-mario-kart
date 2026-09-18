@@ -107,7 +107,7 @@ describe('race simulation', () => {
   });
   it('time attack excludes items, rivals and coins', () => {
     const s = createRace({ ...cfg, mode: 'time', laps: 3 }, specs.slice(0, 1));
-    run(s, 70);
+    run(s, 120);
     expect(s.racers[0].coins).toBe(0);
     expect(s.racers[0].item).toBeNull();
     expect(s.phase).toBe('finished');

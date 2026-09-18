@@ -3,6 +3,7 @@ export class InputManager {
   private keys = new Set<string>();
   private touches = new Map<string, Set<number>>();
   private queuedItem = [false, false];
+  private queuedDrift = [false, false];
   private keydown: (e: KeyboardEvent) => void;
   private keyup: (e: KeyboardEvent) => void;
   private blur = () => this.clear();
@@ -42,6 +43,9 @@ export class InputManager {
         this.queuedItem[0] = true;
       if (!e.repeat && ['Enter', 'Slash'].includes(e.code))
         this.queuedItem[1] = true;
+      if (!e.repeat && ['ShiftLeft', 'KeyQ'].includes(e.code))
+        this.queuedDrift[0] = true;
+      if (!e.repeat && e.code === 'ShiftRight') this.queuedDrift[1] = true;
       this.keys.add(e.code);
     };
     this.keyup = (e) => this.keys.delete(e.code);
@@ -52,6 +56,7 @@ export class InputManager {
   touch(action: string, pointer: number, pressed: boolean) {
     if (pressed) {
       if (action === 'item') this.queuedItem[0] = true;
+      if (action === 'drift') this.queuedDrift[0] = true;
       if (!this.touches.has(action)) this.touches.set(action, new Set());
       this.touches.get(action)!.add(pointer);
     } else this.touches.get(action)?.delete(pointer);
@@ -63,13 +68,15 @@ export class InputManager {
     if (!this.active) return { ...EMPTY_INPUT };
     const has = (...keys: string[]) => keys.some((k) => this.keys.has(k));
     const pending = this.queuedItem[player];
+    const jump = this.queuedDrift[player];
     this.queuedItem[player] = false;
+    this.queuedDrift[player] = false;
     if (player === 1)
       return {
         throttle: this.autoAccelerate || has('ArrowUp') ? 1 : 0,
         brake: has('ArrowDown') ? 1 : 0,
         steer: (has('ArrowRight') ? 1 : 0) - (has('ArrowLeft') ? 1 : 0),
-        drift: has('ShiftRight'),
+        drift: jump || has('ShiftRight'),
         item: pending || has('Enter', 'Slash'),
       };
     const right =
@@ -91,7 +98,7 @@ export class InputManager {
           ? 1
           : 0,
       steer: Number(right) - Number(left),
-      drift: has('ShiftLeft', 'KeyQ') || this.pressed('drift'),
+      drift: jump || has('ShiftLeft', 'KeyQ') || this.pressed('drift'),
       item: pending || has('Space', 'KeyE') || this.pressed('item'),
     };
     const gamepad = navigator.getGamepads?.()[0];
@@ -111,6 +118,7 @@ export class InputManager {
     this.keys.clear();
     this.touches.clear();
     this.queuedItem = [false, false];
+    this.queuedDrift = [false, false];
   }
   dispose() {
     window.removeEventListener('keydown', this.keydown);

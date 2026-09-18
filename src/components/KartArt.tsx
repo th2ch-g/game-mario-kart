@@ -1,55 +1,62 @@
+import { useEffect, useState } from 'react';
+import * as THREE from 'three';
+import { makeKart } from '../render/kart';
+import { materials } from '../render/primitives';
 import { KARTS } from '../game/catalog';
+
+const previews = new Map<number, string>();
 export function KartArt({ kart = 0 }: { kart?: number }) {
-  const k = KARTS[kart];
-  return (
-    <svg viewBox="0 0 240 160" className="kart-art" aria-hidden="true">
-      <ellipse cx="122" cy="134" rx="85" ry="12" fill="#173d37" opacity=".08" />
-      <path d="M45 100l55-28 99 27-59 34z" fill="#2e4546" />
-      <g fill="#293e40">
-        <rect
-          x="43"
-          y="87"
-          width="27"
-          height="36"
-          rx="10"
-          transform="rotate(-12 43 87)"
-        />
-        <rect
-          x="162"
-          y="92"
-          width="28"
-          height="38"
-          rx="10"
-          transform="rotate(-12 162 92)"
-        />
-        <rect x="94" y="67" width="23" height="31" rx="9" />
-        <rect x="195" y="83" width="23" height="34" rx="9" />
-      </g>
-      <path d="M59 92l47-26 85 20 1 24-55 24-76-22z" fill={k.color} />
-      <path d="M61 93l47-22 82 17-54 26z" fill={k.secondary} />
-      <path d="M66 94l34-14 38 10-32 15z" fill={k.color} />
-      <path d="M137 114l55-25v20l-54 24z" fill={k.color} />
-      <path d="M156 99l-2-16 25-12 1 18" fill="#314344" />
-      <path d="M179 77l-4-22-49-13-14 7 44 14 4 20" fill={k.color} />
-      <path d="M133 88l-18-6-4-25 22 4z" fill="#384c4a" />
-      <ellipse cx="121" cy="54" rx="21" ry="23" fill={k.color} />
-      <path d="M101 47q14-9 33 2l3 11q-18 8-35-2z" fill="#2c5960" />
-      <path
-        d="M106 49l11-1"
-        stroke="#dfffee"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path d="M96 79l-16 12 7 6 20-12" fill={k.secondary} />
-      <path d="M64 108l72 19v9l-72-18z" fill={k.color} />
-      <path
-        d="M74 110l44 12"
-        stroke="#fff2d3"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-      <circle cx="57" cy="110" r="7" fill="#b3c4be" />
-      <circle cx="177" cy="115" r="7" fill="#b3c4be" />
-    </svg>
+  const [preview, setPreview] = useState(previews.get(kart));
+  useEffect(() => {
+    if (previews.has(kart)) {
+      setPreview(previews.get(kart));
+      return;
+    }
+    let renderer: THREE.WebGLRenderer | undefined;
+    const scene = new THREE.Scene();
+    try {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(480, 320);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      scene.add(new THREE.HemisphereLight('#f1ffff', '#829394', 2.4));
+      const light = new THREE.DirectionalLight('#fff0d0', 2.4);
+      light.position.set(-4, 8, 5);
+      scene.add(light);
+      scene.add(makeKart(kart));
+      const camera = new THREE.PerspectiveCamera(34, 1.5, 0.1, 40);
+      camera.position.set(-5.8, 3.8, 6.6);
+      camera.lookAt(0, 0.95, 0);
+      renderer.render(scene, camera);
+      const url = renderer.domElement.toDataURL('image/png');
+      previews.set(kart, url);
+      setPreview(url);
+    } catch {
+      setPreview(undefined);
+    } finally {
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          const list = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+          for (const material of list)
+            if (![...materials.values()].includes(material)) material.dispose();
+        }
+      });
+      renderer?.dispose();
+      renderer?.forceContextLoss();
+    }
+  }, [kart]);
+  return preview ? (
+    <img
+      src={preview}
+      className="kart-art"
+      width="480"
+      height="320"
+      alt={`${KARTS[kart].label}の3Dカート`}
+    />
+  ) : (
+    <span className="kart-art">{KARTS[kart].name}</span>
   );
 }

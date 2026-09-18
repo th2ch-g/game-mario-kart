@@ -6,23 +6,29 @@ A complete 3D kart racer for the browser, built with Three.js, React and TypeScr
 
 - **Quick race:** eight karts, three courses, six karts with different handling, three CPU difficulties, and one, three or five laps.
 - **Grand Prix:** race all three courses and compete for a cumulative championship. Points per race are 15, 12, 10, 8, 6, 4, 2 and 1.
-- **Time attack:** three laps with no opponents, items, coins or track boosts. Personal bests and a replay ghost are stored in the current browser.
+- **Time attack:** three laps with no opponents, held items or coins. Track ramps and boost pads remain active. Personal bests and a replay ghost are stored in the current browser.
 - **Split screen:** two independent karts and cameras on the same computer, with separate keyboard controls and six CPU opponents.
 - **Friends:** two to eight people, room code, invitation link, QR code, ready checks, host settings, CPU fill, host pause, guest reconnection and rematch.
 
-The three worlds are Sunshine Coast, Maple Highland and Starlight City. Courses have continuous elevation, raised sections, roadside scenery, item boxes, coins and boost pads. The chase camera follows the road ahead; race HUDs include ranking, lap count, timer, speed, inventory, drift charge and a live minimap.
+Sunshine Coast combines harbor S-bends, a lighthouse hairpin and a boardwalk jump. Maple Highland climbs through switchbacks, a suspension bridge, a rock tunnel and a downhill jump. Starlight City is a grade-separated figure eight with a neon tunnel, an elevated expressway and a downtown chicane. Banked corners, changing road widths, lane-specific boost pads, optional ramps and solid obstacles create different racing lines. The chase camera follows the road ahead; race HUDs include ranking, lap count, timer, speed, inventory, drift charge and a live minimap.
 
 ## Driving
 
 Auto acceleration and steering assistance are enabled by default. Both can be changed in settings. Assistance follows bends when the steering control is released and helps keep the kart near the road. Manual steering overrides it. Offroad terrain slows the kart, and barriers prevent leaving the playable area.
 
-Hold drift while steering to charge a mini turbo, then release it. Longer charges give longer boosts. Coins increase maximum speed up to ten coins. Item boxes provide a turbo, homing rocket, trap, shield or a short-range pulse; racers near the back receive a different item distribution. A shield blocks one hit. A hit causes a spin and drops three coins. Finished drivers continue under CPU control until the results screen.
+Press drift while steering to hop into a drift. The initial turn direction stays locked; countersteering opens the corner without reversing the drift. Blue, orange and purple sparks mark three mini-turbo levels, released by letting go of drift. Grounded tire grip and the shorter inside line affect progress.
+
+Ramps launch the kart along a ballistic arc. Press drift just before takeoff or during flight to perform a spinning trick and earn a landing boost. Holding the button throughout the approach does not repeatedly award tricks. The same controls work with a keyboard, touch and a gamepad.
+
+Item boxes use position-weighted roulette: leaders receive more defensive items and trailing racers receive stronger comeback tools. There are eleven items: mushroom, triple mushroom, red homing shell, green bouncing shell, banana, shield, horn, star, lightning, blue leader-seeking shell and automatic rocket. Hold a shell or banana to guard, then release to throw; hold brake when releasing a shell to throw it backwards. Triple mushrooms require three distinct presses. The horn clears nearby shells, including blue shells. Stars and rockets prevent damage; lightning temporarily shrinks and slows unprotected opponents.
+
+Coins increase maximum speed up to ten coins. A shield blocks one hit. A hit causes a spin and drops three coins. Finished drivers continue under CPU control until the results screen.
 
 | Action             | Solo / online         | Split player 1  | Split player 2 |
 | ------------------ | --------------------- | --------------- | -------------- |
 | Steer              | Left / Right or A / D | A / D           | Left / Right   |
 | Accelerate / brake | Up / Down or W / S    | W / S           | Up / Down      |
-| Drift              | Left Shift or Q       | Left Shift or Q | Right Shift    |
+| Drift / jump trick | Left Shift or Q       | Left Shift or Q | Right Shift    |
 | Use item           | Space or E            | Space or E      | Enter or Slash |
 | Pause              | Escape or P           | Escape or P     | Escape or P    |
 
@@ -53,7 +59,7 @@ PLAYWRIGHT_BROWSERS_PATH=.cache/playwright npx playwright install webkit
 PLAYWRIGHT_BROWSERS_PATH=.cache/playwright PLAYWRIGHT_BROWSER=webkit npm run test:e2e -- tests/game.spec.ts
 ```
 
-Unit tests run complete deterministic races on every track and CPU difficulty. They cover checkpoints, lap counting, ranking, braking, terrain, collisions, item effects, drift boosts, malformed input, reconnection takeover, storage validation and ghost records. Browser tests exercise real rendering, keyboard input, complete races, a full three-course championship, a completed ghost run, split screen, simultaneous touch input, accessible menus and actual WebRTC connections between isolated browser contexts.
+Unit tests run complete deterministic races on every track and CPU difficulty. They cover camera-projected left/right input on every course, tire axes and front-wheel steering, road-edge folding and overpass clearance, jump trajectories, trick timing, landing boosts, all drift levels, item defenses and comeback weighting, checkpoints, lap counting, ranking, braking, collisions, malformed input, reconnection takeover, storage validation and ghost records. Browser tests exercise real rendering, keyboard input, complete races, a full three-course championship, a completed ghost run, split screen, simultaneous touch input, accessible menus and actual WebRTC connections between isolated browser contexts.
 
 Tests use the production build served by Vite preview. Set `PLAYWRIGHT_BASE_URL` to a deployed URL, including its trailing slash, to run against a published build. `tests/capture.mjs` captures the home screen and an actual race. Generated builds, caches, traces and screenshots are ignored by Git.
 
@@ -69,7 +75,7 @@ The host runs the authoritative simulation at 60 fixed steps per second, accepts
 
 Host roster membership determines the player that a connection may control. Reconnection requires the same per-tab player token; clients cannot submit their own position or race result. Sequence checks and input rate limits reject stale or excessive control packets. This is a casual private-room game, not a ranked anti-cheat service.
 
-Only the host can pause an online race. Moving the host tab into the background pauses everyone. Returning requires the host to resume. A disconnected guest is driven by the CPU, can reload the same tab and use **Reconnect to previous room**, and receives the current authoritative snapshot. A host reload reopens the room lobby and starts a new session; it does not restore the previous race. Leaving the host closes the room. A finished race waits up to eight seconds after all humans finish for CPU racers, or up to thirty seconds after the first human finishes for other humans. Remaining racers are classified by progress and marked unfinished.
+Only the host can pause an online race. Moving the host tab into the background pauses everyone. Returning requires the host to resume. A disconnected guest is driven by the CPU, can reload the same tab and use **Reconnect to previous room**, and receives the current authoritative snapshot. A host reload reopens the room lobby and starts a new session; it does not restore the previous race. Leaving the host closes the room. A finished race waits up to twenty seconds after all humans finish for CPU racers, or up to thirty seconds after the first human finishes for other humans. Remaining racers are classified by progress and marked unfinished.
 
 Default room discovery uses the public PeerJS signaling service; racing data uses a WebRTC data channel. Some restrictive networks or symmetric NATs require a working TURN relay. The connection panel accepts a TURN URL, username and password, and an optional custom PeerServer. Credentials remain in memory and are never stored or included in invitation links. Signaling and TURN availability depend on their providers.
 
@@ -77,7 +83,7 @@ Default room discovery uses the public PeerJS signaling service; racing data use
 
 WebGL 2 is required. Static geometry is batched by material. Quality settings adjust pixel ratio, antialiasing and shadows; automatic quality uses a lighter profile on narrow screens and devices with few CPU cores. Graphics settings can be changed during a paused race. The app reports context loss and provides a lightweight reload option when rendering cannot start.
 
-Responsive browser tests do not constitute physical iPhone or Android testing. Performance and support depend on the device, browser, graphics driver and network. Time-attack ghosts and preferences remain local to the current browser; blocked or full browser storage is handled without interrupting a race.
+Responsive browser tests do not constitute physical iPhone or Android testing. Performance and support depend on the device, browser, graphics driver and network. Course redesigns use a new record namespace so earlier layouts cannot supply incompatible best times or ghosts. Time-attack ghosts and preferences remain local to the current browser; blocked or full browser storage is handled without interrupting a race.
 
 ## Source layout
 

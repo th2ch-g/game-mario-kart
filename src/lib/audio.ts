@@ -58,6 +58,9 @@ export class AudioEngine {
       lap: 880,
       finish: 1046,
       go: 660,
+      trick: 1200,
+      star: 980,
+      lightning: 140,
       tick: 440,
       click: 520,
     };

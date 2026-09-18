@@ -34,9 +34,9 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { KARTS, ITEMS } from './game/catalog';
-import { formatTime } from './game/engine';
-import { getTrack, TRACKS } from './game/tracks';
-import type { Mode, RaceConfig, Settings } from './game/types';
+import { driftStage, formatTime } from './game/engine';
+import { getTrack, sectionAt, TRACKS } from './game/tracks';
+import type { Item, Mode, RaceConfig, Settings } from './game/types';
 import { Runtime } from './lib/runtime';
 import { audio } from './lib/audio';
 import {
@@ -49,6 +49,7 @@ import {
 } from './lib/network';
 import { readRecords, readSettings, saveSettings } from './lib/storage';
 import { KartArt } from './components/KartArt';
+import { ItemArt } from './components/ItemArt';
 import { Modal } from './components/Modal';
 import { SceneCanvas } from './components/SceneCanvas';
 import { TouchControls } from './components/TouchControls';
@@ -855,7 +856,7 @@ export function App() {
             </div>
             <div className="race-progress">
               <span className="race-course">
-                {TRACKS[race.config.track].subtitle}
+                {sectionAt(getTrack(race.config.track), player.s).name}
               </span>
               <div>
                 <span className="lap-counter">
@@ -902,14 +903,43 @@ export function App() {
             </div>
           </div>
           <div className="race-left">
-            <div className={`item-slot ${item ? 'has-item' : ''}`}>
-              <span>{item ? item.icon : '?'}</span>
+            <div
+              className={`item-slot ${item ? 'has-item' : ''} ${player.roulette > 0 ? 'item-roulette' : ''}`}
+              data-ready={player.roulette <= 0}
+            >
+              <span>
+                {player.item ? (
+                  <ItemArt
+                    kind={
+                      player.roulette > 0
+                        ? (Object.keys(ITEMS) as Item[])[
+                            Math.floor(race.time * 18) %
+                              Object.keys(ITEMS).length
+                          ]
+                        : player.item
+                    }
+                  />
+                ) : (
+                  '?'
+                )}
+              </span>
               <div>
                 <strong data-testid="held-item">
-                  {item ? item.name : 'アイテム'}
+                  {player.roulette > 0
+                    ? 'アイテム抽選中'
+                    : item
+                      ? `${item.name}${player.itemCharges > 1 ? ` ×${player.itemCharges}` : ''}`
+                      : 'アイテム'}
                 </strong>
                 <small>
-                  {item ? 'SPACE / E で使う' : 'ボックスを通過してゲット'}
+                  {player.defending
+                    ? 'ガード中 · 離すと発射'
+                    : item
+                      ? player.item &&
+                        ['mine', 'green', 'rocket'].includes(player.item)
+                        ? 'SPACE / E · 長押しでガード'
+                        : 'SPACE / E で使う'
+                      : 'ボックスを通過してゲット'}
                 </small>
               </div>
             </div>
@@ -977,29 +1007,45 @@ export function App() {
           </div>
           {player.driftCharge > 0.15 && (
             <div
-              className={`drift-meter ${player.driftCharge >= 1.2 ? 'charged' : ''}`}
+              className={`drift-meter drift-stage-${driftStage(player.driftCharge)} ${driftStage(player.driftCharge) > 0 ? 'charged' : ''}`}
             >
               <span>
-                {player.driftCharge >= 2
-                  ? 'SUPER TURBO'
-                  : player.driftCharge >= 0.65
-                    ? 'RELEASE TO BOOST'
-                    : 'DRIFT CHARGING'}
+                {
+                  [
+                    'DRIFT CHARGING',
+                    'RELEASE TO BOOST',
+                    'SUPER MINI-TURBO',
+                    'ULTRA MINI-TURBO',
+                  ][driftStage(player.driftCharge)]
+                }
               </span>
               <div>
                 <i
                   style={{
-                    width: `${Math.min(100, (player.driftCharge / 2) * 100)}%`,
+                    width: `${Math.min(100, (player.driftCharge / 2.7) * 100)}%`,
                   }}
                 />
               </div>
             </div>
           )}
-          {player.boost > 0 && player.spin <= 0 && (
-            <div className="boost-indicator">
-              <Zap size={20} /> TURBO!
-            </div>
-          )}
+          {(player.boost > 0 ||
+            player.lift > 0 ||
+            player.star > 0 ||
+            player.bullet > 0) &&
+            player.spin <= 0 && (
+              <div className="boost-indicator">
+                <Zap size={20} />{' '}
+                {player.bullet > 0
+                  ? 'ROCKET!'
+                  : player.star > 0
+                    ? 'INVINCIBLE!'
+                    : player.trick
+                      ? 'TRICK! → LANDING BOOST'
+                      : player.lift > 0
+                        ? 'JUMP!  SHIFT / DRIFT'
+                        : 'TURBO!'}
+              </div>
+            )}
           {player.spin > 0 && <div className="hit-indicator">SPIN!</div>}
           {race.phase === 'countdown' && (
             <div className="countdown" role="status">
@@ -1033,7 +1079,7 @@ export function App() {
             <TouchControls
               input={runtime.input}
               item={item?.name || 'ITEM'}
-              disabled={!item || race.phase !== 'racing'}
+              disabled={!item || player.roulette > 0 || race.phase !== 'racing'}
             />
           )}
           {fullscreenError && (
@@ -1380,10 +1426,18 @@ export function App() {
           <p className="modal-note">
             スマホは左右のボタンとDRIFT・ITEMを同時にタッチ。横向きで広く遊べます。ゲームパッドは左スティックでハンドル、Aでドリフト、Bでアイテム、RTでアクセル、LTでブレーキ。
           </p>
+          <p className="modal-note">
+            曲がりながらDRIFTを押すとホップしてドリフト開始。反対方向のハンドルで曲がり幅を調整し、青→オレンジ→紫の火花を溜めて離すと3段階のミニターボ。ジャンプ台で飛び出す瞬間か空中でDRIFTを押すとトリック、着地で加速します。
+          </p>
+          <p className="modal-note">
+            アイテムは順位に応じて抽選。こうら・バナナはITEMを長押しすると後方を守り、離すと発射。ブレーキを押しながら使うと後ろに投げられます。スター・ロケットは攻撃を防ぎ、スーパーホーンはトゲこうらも破壊します。
+          </p>
           <div className="item-guide">
             {Object.entries(ITEMS).map(([key, value]) => (
               <div key={key}>
-                <span>{value.icon}</span>
+                <span>
+                  <ItemArt kind={key as Item} />
+                </span>
                 <strong>
                   {value.name}
                   <small>{value.description}</small>

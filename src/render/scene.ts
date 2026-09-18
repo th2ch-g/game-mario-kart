@@ -1,231 +1,20 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { KARTS } from '../game/catalog';
 import { getTrack, position, sample, type Track } from '../game/tracks';
 import type { GhostPoint, RaceState, Settings } from '../game/types';
+import {
+  batchStatic,
+  box,
+  cylinder,
+  materials,
+  material,
+  sphere,
+  textSign,
+} from './primitives';
+import { animateKart, makeKart } from './kart';
+import { buildCourseFeatures, buildRoadFoundation } from './features';
+import { makeHazard } from './items';
+import { driftStage } from '../game/engine';
 
-const materials = new Map<string, THREE.MeshStandardMaterial>();
-function batchStatic(
-  root: THREE.Object3D,
-  skip: Set<THREE.Object3D> = new Set(),
-) {
-  root.updateMatrixWorld(true);
-  const groups = new Map<
-    string,
-    { material: THREE.Material; meshes: THREE.Mesh[] }
-  >();
-  root.traverse((child) => {
-    if (
-      !(child instanceof THREE.Mesh) ||
-      Array.isArray(child.material) ||
-      child.name
-    )
-      return;
-    for (
-      let parent: THREE.Object3D | null = child;
-      parent;
-      parent = parent.parent
-    )
-      if (skip.has(parent)) return;
-    const key =
-      child.material.uuid +
-      Object.keys(child.geometry.attributes).join(',') +
-      String(!!child.geometry.index);
-    if (!groups.has(key))
-      groups.set(key, { material: child.material, meshes: [] });
-    groups.get(key)!.meshes.push(child);
-  });
-  const inverse = root.matrixWorld.clone().invert();
-  for (const group of groups.values())
-    if (group.meshes.length > 1) {
-      const geometries = group.meshes.map((m) =>
-        m.geometry
-          .clone()
-          .applyMatrix4(inverse.clone().multiply(m.matrixWorld)),
-      );
-      const merged = mergeGeometries(geometries);
-      if (merged) {
-        const output = new THREE.Mesh(merged, group.material);
-        output.castShadow = group.meshes.some((m) => m.castShadow);
-        output.receiveShadow = true;
-        root.add(output);
-        for (const m of group.meshes) {
-          m.removeFromParent();
-          m.geometry.dispose();
-        }
-      }
-      geometries.forEach((g) => g.dispose());
-    }
-}
-function material(color: string, roughness = 0.78) {
-  if (!materials.has(color))
-    materials.set(color, new THREE.MeshStandardMaterial({ color, roughness }));
-  return materials.get(color)!;
-}
-function mesh(
-  geometry: THREE.BufferGeometry,
-  color: string,
-  parent: THREE.Object3D,
-  x = 0,
-  y = 0,
-  z = 0,
-) {
-  const m = new THREE.Mesh(geometry, material(color));
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  m.receiveShadow = true;
-  parent.add(m);
-  return m;
-}
-function box(
-  parent: THREE.Object3D,
-  color: string,
-  size: number[],
-  pos: number[],
-) {
-  return mesh(
-    new THREE.BoxGeometry(...(size as [number, number, number])),
-    color,
-    parent,
-    ...(pos as [number, number, number]),
-  );
-}
-function cylinder(
-  parent: THREE.Object3D,
-  color: string,
-  top: number,
-  bottom: number,
-  height: number,
-  pos: number[],
-  segments = 8,
-) {
-  return mesh(
-    new THREE.CylinderGeometry(top, bottom, height, segments),
-    color,
-    parent,
-    ...(pos as [number, number, number]),
-  );
-}
-function sphere(
-  parent: THREE.Object3D,
-  color: string,
-  radius: number,
-  pos: number[],
-  detail = 1,
-) {
-  return mesh(
-    new THREE.IcosahedronGeometry(radius, detail),
-    color,
-    parent,
-    ...(pos as [number, number, number]),
-  );
-}
-function textSign(
-  text: string,
-  background: string,
-  foreground: string,
-  width = 11,
-  height = 2.5,
-) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 768;
-  canvas.height = 192;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = background;
-  ctx.fillRect(0, 0, 768, 192);
-  ctx.fillStyle = foreground;
-  ctx.font = '900 88px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 384, 101);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const sign = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
-  );
-  return sign;
-}
-export function makeKart(index: number, ghost = false): THREE.Group {
-  const group = new THREE.Group(),
-    kart = KARTS[index % KARTS.length];
-  box(group, '#283b40', [2.35, 0.3, 3.5], [0, 0.65, 0]);
-  const body = box(group, kart.color, [2.1, 0.65, 2.55], [0, 1, 0]);
-  body.rotation.x = -0.04;
-  box(group, kart.secondary, [1.8, 0.22, 1.05], [0, 1.22, 1.2]);
-  box(group, kart.color, [2.65, 0.35, 0.55], [0, 0.72, 1.9]);
-  box(group, '#f4f4df', [2.1, 0.13, 0.18], [0, 0.94, 2.19]);
-  box(group, '#233940', [1.25, 0.8, 0.7], [0, 1.3, -0.55]);
-  for (const x of [-1.32, 1.32])
-    for (const z of [-1.12, 1.12]) {
-      const wheel = cylinder(
-        group,
-        '#26333b',
-        0.58,
-        0.58,
-        0.46,
-        [x, 0.6, z],
-        12,
-      );
-      wheel.rotation.z = Math.PI / 2;
-      wheel.name = 'wheel';
-      const hub = cylinder(group, '#c9d7d6', 0.26, 0.26, 0.48, [x, 0.6, z], 10);
-      hub.rotation.z = Math.PI / 2;
-    }
-  cylinder(group, kart.secondary, 0.38, 0.45, 0.72, [0, 1.65, -0.18]);
-  sphere(group, kart.color, 0.69, [0, 2.35, -0.22], 2);
-  const visor = sphere(group, '#234b52', 0.55, [0, 2.38, 0.11], 2);
-  visor.scale.set(1, 0.53, 0.75);
-  sphere(group, '#effce7', 0.12, [-0.27, 2.52, 0.45]);
-  const wheel = new THREE.Mesh(
-    new THREE.TorusGeometry(0.32, 0.055, 5, 12),
-    material('#26333b'),
-  );
-  wheel.position.set(0, 1.62, 0.5);
-  wheel.rotation.x = 0.7;
-  group.add(wheel);
-  for (const x of [-0.75, 0.75])
-    box(group, '#26333b', [0.12, 0.7, 0.12], [x, 1.2, -1.55]);
-  box(group, kart.color, [2.6, 0.15, 0.65], [0, 1.58, -1.65]);
-  for (const x of [-0.6, 0.6]) {
-    const flame = new THREE.Mesh(
-      new THREE.ConeGeometry(0.28, 1.5, 6),
-      new THREE.MeshBasicMaterial({ color: '#8ef3ef' }),
-    );
-    flame.rotation.x = -Math.PI / 2;
-    flame.position.set(x, 0.68, -2.5);
-    flame.name = 'flame';
-    flame.visible = false;
-    group.add(flame);
-    const spark = sphere(group, '#ffcb5a', 0.19, [x * 2, 0.3, -1.8]);
-    spark.name = 'spark';
-    spark.visible = false;
-  }
-  const shield = new THREE.Mesh(
-    new THREE.SphereGeometry(2.4, 16, 12),
-    new THREE.MeshBasicMaterial({
-      color: '#a6ffec',
-      transparent: true,
-      opacity: 0.16,
-      wireframe: true,
-    }),
-  );
-  shield.position.y = 1.1;
-  shield.name = 'shield';
-  shield.visible = false;
-  group.add(shield);
-  if (ghost)
-    group.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.material = (child.material as THREE.Material).clone();
-        (child.material as THREE.Material).transparent = true;
-        (child.material as THREE.Material).opacity = 0.28;
-        child.castShadow = false;
-      }
-    });
-  batchStatic(group);
-  return group;
-}
 function ribbon(
   track: Track,
   inner: number,
@@ -243,7 +32,12 @@ function ribbon(
   for (let i = 0; i <= count; i++) {
     const p = sample(track, (i / count) * track.length);
     for (const offset of [inner, outer]) {
-      points.push(p.x + p.nx * offset, p.y + height, p.z + p.nz * offset);
+      const lane = (offset * p.width) / track.definition.width;
+      points.push(
+        p.x + p.nx * lane,
+        p.y - Math.tan(p.bank) * lane + height,
+        p.z + p.nz * lane,
+      );
       const c = striped && Math.floor(i / 4) % 2 === 0 ? alternate : base;
       colors.push(c.r, c.g, c.b);
     }
@@ -399,8 +193,8 @@ export class RaceScene {
     cylinder(
       this.world,
       night ? '#364d61' : '#e7d9a8',
-      118,
-      122,
+      183,
+      188,
       5,
       [0, -4, 0],
       64,
@@ -408,14 +202,15 @@ export class RaceScene {
     const island = cylinder(
       this.world,
       def.ground,
-      113,
-      117,
+      177,
+      183,
       4,
       [0, -0.9, 0],
       64,
     );
     island.rotation.y = 0.04;
     const w = def.width / 2;
+    buildRoadFoundation(this.world, t);
     this.world.add(
       ribbon(t, -w - 1.4, w + 1.4, night ? '#ad90ef' : '#d8ccb3', -0.1),
     );
@@ -431,17 +226,10 @@ export class RaceScene {
           [p.x, p.y + 0.06, p.z],
         );
       dash.rotation.y = p.heading;
-      if (p.y > 6 && Math.floor(s / 7) % 3 === 0) {
-        cylinder(this.world, night ? '#66768d' : '#c4b699', 1.2, 1.8, p.y, [
-          p.x,
-          p.y / 2 - 1,
-          p.z,
-        ]);
-      }
     }
     for (let s = 9; s < t.length; s += 11)
       for (const side of [-1, 1]) {
-        const p = position(t, s, (w + 1.4) * side);
+        const p = position(t, s, (sample(t, s).width / 2 + 1.4) * side);
         const rail = box(
           this.world,
           night ? '#b1a3f3' : '#f5edcf',
@@ -520,14 +308,22 @@ export class RaceScene {
         this.world.add(group);
         this.boxes.push(group);
       }
-    for (const fraction of def.pads) {
-      const p = position(t, fraction * t.length, 0),
+    for (const pad of def.pads) {
+      const p = position(t, pad.at * t.length, pad.offset),
         group = new THREE.Group();
       group.position.set(p.x, p.y + 0.09, p.z);
       group.rotation.y = p.heading;
-      box(group, '#e8c44f', [6, 0.08, 4], [0, 0, 0]);
+      group.rotation.x = -p.slope;
+      group.rotation.z = p.bank;
+      box(group, '#e8c44f', [pad.width, 0.08, 5], [0, 0, 0]);
       for (const z of [-1, 0, 1]) {
-        const arrow = textSign('› › ›', '#e8c44f', '#fffce0', 5.3, 0.7);
+        const arrow = textSign(
+          '› › ›',
+          '#e8c44f',
+          '#fffce0',
+          pad.width * 0.85,
+          0.7,
+        );
         arrow.rotation.x = -Math.PI / 2;
         arrow.rotation.z = Math.PI / 2;
         arrow.position.set(0, 0.06, z);
@@ -560,11 +356,11 @@ export class RaceScene {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       return seed / 4294967296;
     };
-    for (let i = 0; i < 200; i++) {
-      const x = (rand() - 0.5) * 220,
-        z = (rand() - 0.5) * 210;
+    for (let i = 0; i < 330; i++) {
+      const x = (rand() - 0.5) * 340,
+        z = (rand() - 0.5) * 320;
       if (
-        x * x + z * z > 108 * 108 ||
+        x * x + z * z > 174 * 174 ||
         t.samples.some(
           (p, j) => j % 8 === 0 && (p.x - x) ** 2 + (p.z - z) ** 2 < 230,
         )
@@ -592,7 +388,7 @@ export class RaceScene {
             );
             window.material = windowMaterial;
           }
-      } else if (id === 0 && i % 3 === 0) {
+      } else if (id === 0) {
         const trunk = cylinder(
           object,
           '#bd9165',
@@ -645,10 +441,16 @@ export class RaceScene {
       this.world.add(object);
     }
     for (const [x, z, r, h] of [
-      [-23, -13, 18, 29],
-      [12, -25, 14, 22],
-      [-16, 22, 11, 15],
+      [16, 47, 13, 23],
+      [48, -53, 12, 20],
+      [-68, 6, 9, 13],
     ]) {
+      if (
+        t.samples.some(
+          (p, i) => i % 4 === 0 && Math.hypot(p.x - x, p.z - z) < r + 12,
+        )
+      )
+        continue;
       const peak = cylinder(
         this.world,
         night ? '#516581' : id === 1 ? '#a6987d' : '#91b392',
@@ -705,6 +507,7 @@ export class RaceScene {
       flag.rotation.y = 0.25;
       this.world.add(g);
     }
+    buildCourseFeatures(this.world, t);
     batchStatic(
       this.world,
       new Set([...this.boxes, ...this.coins, ...this.pads]),
@@ -722,6 +525,10 @@ export class RaceScene {
     spin: number,
     dt: number,
     smooth: boolean,
+    speed = 16,
+    steer = 0,
+    lift = 0,
+    verticalSpeed = 0,
   ) {
     let car = this.cars.get(id);
     if (!car || car.userData.kart !== kart) {
@@ -735,17 +542,22 @@ export class RaceScene {
       this.scene.add(car);
     }
     const p = position(this.track, s, offset),
-      target = new THREE.Vector3(p.x, p.y + 0.12, p.z);
+      target = new THREE.Vector3(p.x, p.y + 0.05 + lift, p.z);
     if (smooth && car.userData.ready)
       car.position.lerp(target, Math.min(1, dt * 18));
     else car.position.copy(target);
-    const heading = p.heading + yaw + (spin > 0 ? spin * 15 : 0);
+    const heading = p.heading - yaw + (spin > 0 ? spin * 15 : 0);
     car.rotation.y +=
       THREE.MathUtils.euclideanModulo(
         heading - car.rotation.y + Math.PI,
         Math.PI * 2,
       ) - Math.PI;
-    car.rotation.z = -yaw * 0.12;
+    car.rotation.x =
+      lift > 0
+        ? -Math.atan2(verticalSpeed, Math.max(12, speed)) * 0.55
+        : -p.slope;
+    car.rotation.z = p.bank + steer * (charge > 0 ? 0.07 : 0.025);
+    animateKart(car, speed, steer, charge > 0, dt);
     car.userData.ready = true;
     car.children.forEach((child) => {
       if (child.name === 'flame') {
@@ -794,7 +606,7 @@ export class RaceScene {
     } else
       for (const r of state.racers) {
         validIds.add(r.id);
-        this.updateCar(
+        const car = this.updateCar(
           r.id,
           r.kart,
           r.s,
@@ -806,7 +618,58 @@ export class RaceScene {
           r.spin,
           dt,
           state.config.mode === 'online',
+          r.speed,
+          r.steer,
+          r.lift + Math.sin((r.hop / 0.3) * Math.PI) * 0.45,
+          r.verticalSpeed,
         );
+        car.scale.setScalar(r.shrink > 0 ? 0.62 : 1);
+        if (r.trick)
+          car.rotation.y +=
+            Math.PI *
+            2 *
+            (r.trickProgress * r.trickProgress * (3 - 2 * r.trickProgress));
+        for (const part of car.children) {
+          if (part.name === 'star-ring') {
+            part.visible = r.star > 0;
+            part.rotation.y = time * 5;
+          }
+          if (part.name === 'bullet-body') part.visible = r.bullet > 0;
+          if (['chassis', 'front-wheel', 'rear-wheel'].includes(part.name))
+            part.visible = r.bullet <= 0;
+          if (part.name === 'flame') part.visible = r.boost > 0 || r.bullet > 0;
+          if (part.name === 'spark' && part instanceof THREE.Mesh) {
+            part.visible = driftStage(r.driftCharge) > 0;
+            const color = ['#ffd158', '#61d4ff', '#ff9c43', '#cc77ff'][
+              driftStage(r.driftCharge)
+            ];
+            (part.material as THREE.MeshStandardMaterial).color.set(color);
+            part.scale.setScalar(
+              0.8 +
+                Math.sin(time * 35) * 0.35 +
+                driftStage(r.driftCharge) * 0.25,
+            );
+          }
+        }
+        let guard = car.getObjectByName('guard');
+        if (guard && guard.userData.kind !== r.item) {
+          guard.removeFromParent();
+          this.disposeGroup(guard);
+          guard = undefined;
+        }
+        if (
+          r.defending &&
+          !guard &&
+          r.item &&
+          ['mine', 'green', 'rocket'].includes(r.item)
+        ) {
+          guard = makeHazard(r.item as 'mine' | 'green' | 'rocket');
+          guard.name = 'guard';
+          guard.userData.kind = r.item;
+          guard.position.set(0, 0, -2.8);
+          car.add(guard);
+        }
+        if (guard) guard.visible = r.defending;
       }
     for (const [id, car] of this.cars)
       if (!validIds.has(id)) {
@@ -823,24 +686,19 @@ export class RaceScene {
       c.rotation.z = time * 2;
       c.visible = state?.config.mode !== 'time';
     });
-    this.pads.forEach((p) => (p.visible = state?.config.mode !== 'time'));
+    this.pads.forEach((p) => (p.visible = true));
     const hazardIds = new Set<number>();
     for (const h of state?.hazards ?? []) {
       hazardIds.add(h.id);
       let object = this.hazards.get(h.id);
       if (!object) {
-        object = new THREE.Group();
-        if (h.kind === 'mine') {
-          cylinder(object, '#ffbb59', 0, 0.9, 1.4, [0, 0.6, 0], 4);
-        } else {
-          sphere(object, '#ec785e', 0.7, [0, 0.7, 0]);
-        }
+        object = makeHazard(h.kind);
         this.scene.add(object);
         this.hazards.set(h.id, object);
       }
       const p = position(this.track, h.s, h.offset);
-      object.position.set(p.x, p.y + 0.3, p.z);
-      object.rotation.y = p.heading;
+      object.position.set(p.x, p.y + (h.kind === 'blue' ? 1.7 : 0.05), p.z);
+      object.rotation.y = p.heading + (h.kind === 'mine' ? 0 : time * 8);
     }
     for (const [id, object] of this.hazards)
       if (!hazardIds.has(id)) {
@@ -863,8 +721,14 @@ export class RaceScene {
         a.s + (b.s - a.s) * f,
         a.offset + (b.offset - a.offset) * f,
       );
-      this.ghost.position.set(p.x, p.y + 0.1, p.z);
-      this.ghost.rotation.y = p.heading + a.yaw;
+      this.ghost.position.set(
+        p.x,
+        p.y + 0.05 + (a.lift ?? 0) * (1 - f) + (b.lift ?? 0) * f,
+        p.z,
+      );
+      this.ghost.rotation.y = p.heading - a.yaw;
+      this.ghost.rotation.x = -p.slope;
+      this.ghost.rotation.z = p.bank;
       this.ghost.visible = true;
     }
     const split = state?.config.mode === 'local' && localIds.length > 1;
@@ -875,9 +739,9 @@ export class RaceScene {
       this.camera.updateProjectionMatrix();
       const orbit = time * 0.015;
       this.camera.position.set(
-        Math.sin(0.72 + orbit) * 255,
-        180,
-        Math.cos(0.72 + orbit) * 255,
+        Math.sin(0.72 + orbit) * 365,
+        250,
+        Math.cos(0.72 + orbit) * 365,
       );
       this.camera.lookAt(0, 0, 0);
       this.cameraReady = false;
@@ -890,21 +754,22 @@ export class RaceScene {
           r = state.racers.find((r) => r.id === localIds[i]) ?? state.racers[0];
         if (!r) continue;
         const p = position(this.track, r.s, r.offset),
-          target = position(this.track, r.s + 15, r.offset * 0.7),
-          behind = position(
-            this.track,
-            r.s - (r.boost > 0 ? 10.5 : 9),
-            r.offset * 0.9,
-          );
+          ahead = sample(this.track, r.s + 12),
+          heading = p.heading - r.yaw * 0.35,
+          distance = r.boost > 0 ? 10.8 : 9.8;
         const wanted = new THREE.Vector3(
-          behind.x,
-          Math.max(p.y + 5.5, behind.y + 4.7),
-          behind.z,
+          p.x - Math.sin(heading) * distance,
+          p.y + 4.5 + r.lift * 0.65,
+          p.z - Math.cos(heading) * distance,
         );
         if (this.cameraReady)
           camera.position.lerp(wanted, 1 - Math.exp(-dt * 7));
         else camera.position.copy(wanted);
-        camera.lookAt(target.x, target.y + 1.6, target.z);
+        camera.lookAt(
+          p.x + Math.sin(heading) * 15,
+          ahead.y + 1.3 + r.lift * 0.4,
+          p.z + Math.cos(heading) * 15,
+        );
         camera.fov = r.boost > 0 ? 72 : 65;
         for (const [id, car] of this.cars)
           car.visible =

@@ -60,7 +60,7 @@ it('replaces records only when a completed attempt is faster', () => {
 });
 it('ignores malformed ghost data', () => {
   localStorage.setItem(
-    'kartline.records.v1',
+    'kartline.records.v2',
     JSON.stringify([
       {
         track: 0,

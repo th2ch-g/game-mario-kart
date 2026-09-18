@@ -332,6 +332,7 @@ export class Runtime {
               s: r.s,
               offset: r.offset,
               yaw: r.yaw,
+              lift: r.lift,
             });
             this.ghostTime = this.race.time;
           }

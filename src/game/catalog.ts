@@ -67,15 +67,53 @@ export const KARTS = [
   },
 ];
 export const ITEMS = {
-  boost: { name: 'ターボ', icon: '⚡', description: '3秒間スピードアップ' },
-  rocket: {
-    name: 'ロケット',
-    icon: '➤',
-    description: '前のカートを追いかける',
+  boost: { name: 'キノコ', icon: '🍄', description: '加速して悪路も突っ切る' },
+  triple: {
+    name: 'トリプルキノコ',
+    icon: '🍄',
+    description: '好きなタイミングで3回加速',
   },
-  mine: { name: 'トラップ', icon: '◆', description: '後方にトラップを設置' },
+  rocket: {
+    name: 'アカこうら',
+    icon: '🔴',
+    description: '前の相手を追尾。長押しで後方をガード',
+  },
+  green: {
+    name: 'ミドリこうら',
+    icon: '🟢',
+    description: '壁で反射する直進弾。長押しでガード',
+  },
+  mine: {
+    name: 'バナナ',
+    icon: '🍌',
+    description: '後ろに設置。長押しで後方をガード',
+  },
   shield: { name: 'シールド', icon: '◈', description: '8秒間攻撃をガード' },
-  pulse: { name: 'パルス', icon: '✦', description: '近くのライバルをスピン' },
+  pulse: {
+    name: 'スーパーホーン',
+    icon: '📣',
+    description: '周囲の相手・こうらを吹き飛ばす',
+  },
+  star: {
+    name: 'スター',
+    icon: '⭐',
+    description: '7秒間無敵・加速。体当たりで攻撃',
+  },
+  lightning: {
+    name: 'サンダー',
+    icon: '⚡',
+    description: '相手全員を小さくしてスピードダウン',
+  },
+  blue: {
+    name: 'トゲこうら',
+    icon: '🔵',
+    description: '1位を追いかけて周囲ごと爆発',
+  },
+  bullet: {
+    name: 'ロケット',
+    icon: '🚀',
+    description: '5秒間、無敵で自動走行して追い上げる',
+  },
 };
 export const CPU_NAMES = [
   'Coco',

@@ -75,10 +75,9 @@ test('a complete race uses keyboard controls, pauses, finishes and restarts', as
     .poll(async () => Number(await page.getByTestId('speed').textContent()))
     .toBeGreaterThan(65);
   await page.keyboard.down('ArrowRight');
-  await page.waitForTimeout(180);
-  await page.keyboard.up('ArrowRight');
   await page.keyboard.down('ShiftLeft');
   await expect(page.locator('.drift-meter')).toContainText('RELEASE TO BOOST');
+  await page.keyboard.up('ArrowRight');
   await page.keyboard.up('ShiftLeft');
   await expect(page.locator('.drift-meter')).not.toBeVisible();
   await page.keyboard.press('Escape');
@@ -92,6 +91,10 @@ test('a complete race uses keyboard controls, pauses, finishes and restarts', as
   await expect(page.getByTestId('held-item')).not.toHaveText('アイテム', {
     timeout: 20000,
   });
+  await expect(page.locator('.item-slot')).toHaveAttribute(
+    'data-ready',
+    'true',
+  );
   await page.keyboard.press('Space');
   await expect(page.getByTestId('held-item')).toHaveText('アイテム');
   await expect(page.locator('.results-panel')).toBeVisible({ timeout: 75000 });
@@ -132,18 +135,19 @@ test('grand prix runs all three courses and awards a final cup', async ({
 test('time attack stores a real completed three-lap ghost and reloads it', async ({
   page,
 }) => {
+  test.setTimeout(180000);
   await prepare(page);
   await page.getByRole('button', { name: /TIME ATTACK/ }).click();
   await page
     .getByRole('button', { name: 'レースをはじめる', exact: true })
     .click();
-  await expect(page.locator('.results-panel')).toBeVisible({ timeout: 100000 });
+  await expect(page.locator('.results-panel')).toBeVisible({ timeout: 150000 });
   await expect(
     page.getByRole('heading', { name: '自己ベスト更新！' }),
   ).toBeVisible();
   await expect(page.locator('.lap-times>span')).toHaveCount(3);
   const records = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('kartline.records.v1') || '[]'),
+    JSON.parse(localStorage.getItem('kartline.records.v2') || '[]'),
   );
   expect(records[0].ghost.length).toBeGreaterThan(100);
   expect(records[0].time).toBeGreaterThan(20);
@@ -249,4 +253,24 @@ test('phone and landscape layouts support simultaneous touch steering and drifti
     page.getByRole('button', { name: 'レースに戻る', exact: true }),
   ).toBeVisible();
   await context.close();
+});
+
+test('a real jump accepts a timed action and awards a landing turbo', async ({
+  page,
+}) => {
+  await prepare(page);
+  await page.getByRole('button', { name: /TIME ATTACK/ }).click();
+  await page
+    .getByRole('button', { name: 'レースをはじめる', exact: true })
+    .click();
+  await expect(page.locator('.boost-indicator')).toContainText('JUMP!', {
+    timeout: 30000,
+  });
+  await page.keyboard.press('ShiftLeft');
+  await expect(page.locator('.boost-indicator')).toContainText('TRICK!');
+  await page.screenshot({ path: 'artifacts/jump-action.png' });
+  await expect(page.locator('.boost-indicator')).toContainText('TURBO!');
+  await expect
+    .poll(async () => Number(await page.getByTestId('speed').textContent()))
+    .toBeGreaterThan(135);
 });

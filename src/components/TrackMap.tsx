@@ -14,9 +14,17 @@ export function TrackMap({
   className?: string;
 }) {
   const t = getTrack(track),
+    xs = t.samples.map((p) => p.x),
+    zs = t.samples.map((p) => p.z),
+    minX = Math.min(...xs),
+    minZ = Math.min(...zs),
+    scale = 184 / Math.max(Math.max(...xs) - minX, Math.max(...zs) - minZ),
+    mapX = (x: number) => 18 + (x - minX) * scale,
+    mapZ = (z: number) => 18 + (z - minZ) * scale,
     points = t.samples
       .filter((_, i) => i % 8 === 0)
-      .map((p) => `${p.x + 110},${p.z + 110}`)
+      .map((p) => `${mapX(p.x)},${mapZ(p.z)}`)
+      .concat(`${mapX(t.samples[0].x)},${mapZ(t.samples[0].z)}`)
       .join(' ');
   return (
     <svg
@@ -47,8 +55,8 @@ export function TrackMap({
         return (
           <circle
             key={r.id}
-            cx={p.x + 110}
-            cy={p.z + 110}
+            cx={mapX(p.x)}
+            cy={mapZ(p.z)}
             r={r.id === player ? 7 : 4.5}
             fill={KARTS[r.kart].color}
             stroke={r.id === player ? 'white' : '#193d37'}
@@ -57,8 +65,8 @@ export function TrackMap({
         );
       })}
       <rect
-        x={t.samples[0].x + 106}
-        y={t.samples[0].z + 103}
+        x={mapX(t.samples[0].x) - 4}
+        y={mapZ(t.samples[0].z) - 7}
         width="8"
         height="14"
         rx="2"

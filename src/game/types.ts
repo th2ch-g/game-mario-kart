@@ -1,5 +1,16 @@
 export type Mode = 'race' | 'cup' | 'time' | 'local' | 'online';
-export type Item = 'boost' | 'rocket' | 'mine' | 'shield' | 'pulse';
+export type Item =
+  | 'boost'
+  | 'triple'
+  | 'rocket'
+  | 'green'
+  | 'mine'
+  | 'shield'
+  | 'pulse'
+  | 'star'
+  | 'lightning'
+  | 'blue'
+  | 'bullet';
 export type Phase = 'countdown' | 'racing' | 'finished';
 export interface Input {
   throttle: number;
@@ -26,6 +37,23 @@ export interface Racer extends RacerSpec {
   offset: number;
   yaw: number;
   speed: number;
+  steer: number;
+  lift: number;
+  verticalSpeed: number;
+  trick: boolean;
+  lastJump: number;
+  driftDirection: number;
+  driftPressed: boolean;
+  hop: number;
+  trickWindow: number;
+  trickProgress: number;
+  star: number;
+  shrink: number;
+  bullet: number;
+  itemCharges: number;
+  roulette: number;
+  itemHold: number;
+  defending: boolean;
   rank: number;
   lap: number;
   lapStart: number;
@@ -50,11 +78,13 @@ export interface Racer extends RacerSpec {
 }
 export interface Hazard {
   id: number;
-  kind: 'rocket' | 'mine';
+  kind: 'rocket' | 'green' | 'mine' | 'blue';
   s: number;
   offset: number;
   owner: string;
   life: number;
+  yaw: number;
+  direction: number;
 }
 export interface RaceConfig {
   track: number;
@@ -78,7 +108,16 @@ export interface RaceState {
 }
 export interface GameEvent {
   id: number;
-  type: 'item' | 'boost' | 'hit' | 'lap' | 'finish' | 'go';
+  type:
+    | 'item'
+    | 'boost'
+    | 'hit'
+    | 'lap'
+    | 'finish'
+    | 'go'
+    | 'trick'
+    | 'star'
+    | 'lightning';
   racer: string;
 }
 export interface GhostPoint {
@@ -86,6 +125,7 @@ export interface GhostPoint {
   s: number;
   offset: number;
   yaw: number;
+  lift?: number;
 }
 export interface RecordEntry {
   track: number;

@@ -995,7 +995,7 @@ export function App() {
               </div>
             </div>
           )}
-          {player.boost > 0 && (
+          {player.boost > 0 && player.spin <= 0 && (
             <div className="boost-indicator">
               <Zap size={20} /> TURBO!
             </div>

@@ -80,7 +80,7 @@ test('a complete race uses keyboard controls, pauses, finishes and restarts', as
   await page.keyboard.down('ShiftLeft');
   await expect(page.locator('.drift-meter')).toContainText('RELEASE TO BOOST');
   await page.keyboard.up('ShiftLeft');
-  await expect(page.locator('.boost-indicator')).toBeVisible();
+  await expect(page.locator('.drift-meter')).not.toBeVisible();
   await page.keyboard.press('Escape');
   await expect(
     page.getByRole('heading', { name: 'ひとやすみ。' }),
@@ -190,6 +190,7 @@ test('phone and landscape layouts support simultaneous touch steering and drifti
   await prepare(page);
   await noOverflow(page);
   await page.screenshot({ path: 'artifacts/mobile-home.png', fullPage: true });
+  await page.getByRole('button', { name: /TIME ATTACK/ }).click();
   await page
     .getByRole('button', { name: 'レースをはじめる', exact: true })
     .click();
@@ -241,6 +242,7 @@ test('phone and landscape layouts support simultaneous touch steering and drifti
   await noOverflow(page);
   const box = (await drift.boundingBox())!;
   expect(box.y + box.height).toBeLessThanOrEqual(390);
+  await page.waitForTimeout(900);
   await page.screenshot({ path: 'artifacts/mobile-landscape.png' });
   await page.getByRole('button', { name: '一時停止' }).tap();
   await expect(

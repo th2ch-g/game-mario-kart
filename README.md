@@ -94,3 +94,5 @@ Responsive browser tests do not constitute physical iPhone or Android testing. P
 | `tests/`              | Engine, storage, browser and real-network verification         |
 
 Source is available under the repository's MIT license. KARTLINE is an independent kart-racing game and is not affiliated with Nintendo or an official Mario Kart product.
+
+The build also includes `third-party-notices.txt`, containing the licenses and copyright notices of production dependencies, including the DM Sans font. This file is generated from installed packages and is distributed with the site.

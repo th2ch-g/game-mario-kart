@@ -324,7 +324,7 @@ export class NetworkRoom {
     this.joinAttempts++;
     this.reconnecting = true;
     const link = this.peer.connect(PREFIX + this.view.code, {
-      reliable: false,
+      reliable: true,
       serialization: 'json',
     });
     this.links.set('host', link);
